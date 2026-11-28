@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1018">
+<title>2048 TweNe</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&display=swap">
+<style>
+/* Tata letak: satu layar. Papan persegi di tengah, HUD di atas, tombol di bawah dekat jempol. Tema: ink biru-arang dengan aksen tembaga. */
+:root {
+  --bg1: #1b2030; --bg2: #0d1018; --ink: #eef0f6; --muted: #98a0b8; --acc: #f0a45d; --acc-ink: #2a1705;
+  --acc-soft: rgba(240,164,93,.14); --acc-line: rgba(240,164,93,.5);
+  --panel: #131724; --line: rgba(255,255,255,.12); --shade: rgba(0,0,0,.3);
+  --head: 'Bricolage Grotesque', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; --ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: dark;
+}
+.g2 { position: absolute; left: 50%; top: 50%; border-radius: 16px; background: #0a0d15; border: 1px solid var(--line); box-shadow: 0 18px 50px rgba(0,0,0,.45); touch-action: none; }
+.g2 .cell { position: absolute; border-radius: 10px; background: rgba(255,255,255,.045); }
+.g2 .stone { position: absolute; border-radius: 10px; background: repeating-linear-gradient(135deg, #222838 0 6px, #1a1f2d 6px 12px); border: 1px solid rgba(255,255,255,.08); display: grid; place-items: center; color: rgba(255,255,255,.25); }
+.g2 .stone svg { width: 40%; height: 40%; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.t { position: absolute; left: 0; top: 0; border-radius: 10px; display: grid; place-items: center; font-family: var(--head); font-weight: 800; color: #fff;
+  background: hsl(var(--h) 52% var(--l)); box-shadow: 0 2px 0 rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.12); transition: transform .12s ease-out; will-change: transform; }
+.t.spawn { animation: spawn .18s ease-out .1s backwards; }
+.t.pop { animation: pop .2s ease-out .1s backwards; }
+@keyframes spawn { from { scale: .2; opacity: 0; } }
+@keyframes pop { 0% { scale: .7; } 60% { scale: 1.14; } 100% { scale: 1; } }
+.t.big { box-shadow: 0 0 22px hsl(var(--h) 80% 55% / .55), 0 2px 0 rgba(0,0,0,.35); }
+.g2.shake { animation: shake .22s; }
+@keyframes shake { 25% { margin-left: -5px } 75% { margin-left: 5px } }
+.hero2 { display: flex; gap: 8px; justify-content: center; align-items: flex-end; height: 100%; }
+.hero2 .t { position: static; width: 52px; height: 52px; font-size: 20px; animation: bob 2.8s ease-in-out infinite; }
+.hero2 .t:nth-child(2) { animation-delay: -.5s; } .hero2 .t:nth-child(3) { animation-delay: -1s; } .hero2 .t:nth-child(4) { animation-delay: -1.5s; }
+@keyframes bob { 50% { translate: 0 -10px; } }
+
+[hidden] { display: none !important; }
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; overflow: hidden; color: var(--ink); font-family: var(--ui);
+  background: radial-gradient(ellipse at 50% 20%, var(--bg1) 0%, var(--bg2) 88%) center / cover no-repeat var(--bg2);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 10px; display: flex; flex-direction: column; gap: 10px;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+header { display: flex; flex-direction: column; gap: 8px; flex: none; }
+.top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.ttl { display: flex; align-items: center; gap: 8px; min-width: 0; }
+h1 { margin: 0; white-space: nowrap; font: 800 22px/1 var(--head); color: var(--acc); letter-spacing: -.01em; }
+.chip { font-size: 11px; font-weight: 600; letter-spacing: .03em; color: var(--ink); border: 1px solid var(--line); background: var(--shade); border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+.chip.pro { color: var(--acc-ink); background: var(--acc); border-color: transparent; }
+.best { white-space: nowrap; font-size: 12px; background: var(--shade); border-radius: 999px; padding: 4px 10px; font-variant-numeric: tabular-nums; }
+.best b { color: var(--acc); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat { background: var(--shade); border: 1px solid var(--line); border-radius: 10px; padding: 5px 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.stat span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.stat b { font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.stat b.warn { color: #ff8b7e; animation: blink 1s steps(2, jump-none) infinite; }
+@keyframes blink { 50% { opacity: .45; } }
+#board { position: relative; flex: 1; min-height: 0; touch-action: none; }
+#stage { position: absolute; inset: 0; z-index: 1; }
+#wm { position: absolute; left: 0; right: 0; bottom: 2%; text-align: center; pointer-events: none; z-index: 0; font: 800 clamp(56px, 24vw, 130px)/1 var(--head); letter-spacing: -.02em; color: rgba(255,255,255,.05); }
+body.at-home header, body.at-home #board, body.at-home nav { visibility: hidden; }
+#tip { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 20; background: rgba(8,8,14,.92); border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; font-size: 13px; white-space: nowrap; }
+nav { display: flex; gap: 8px; flex: none; }
+nav button { flex: 1; display: grid; place-items: center; }
+button { font: 600 15px var(--ui); color: var(--ink); background: var(--shade); border: 1px solid var(--line); border-radius: 14px; min-height: 52px; padding: 0 12px; cursor: pointer; }
+button:active { transform: scale(.96); }
+button:disabled { opacity: .4; cursor: default; }
+button:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+button.primary { background: var(--acc); color: var(--acc-ink); border-color: transparent; }
+svg.ic { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+#home { position: fixed; inset: 0; z-index: 4000; overflow-y: auto; display: flex;
+  background: radial-gradient(ellipse at 50% 20%, var(--bg1) 0%, var(--bg2) 88%) center / cover no-repeat var(--bg2);
+  padding: max(18px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(18px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.hwrap { width: min(420px, 100%); margin: auto; display: flex; flex-direction: column; gap: 14px; }
+.brand { text-align: center; }
+.hero { position: relative; height: 112px; width: 240px; margin: 0 auto; }
+.logo { margin: 10px 0 0; font: 800 min(50px, 10.6vw)/1.05 var(--head); color: var(--acc); letter-spacing: -.02em; }
+.by { margin: 6px 0 0; color: var(--muted); font-size: 13px; letter-spacing: .06em; }
+.cont { display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: left; padding: 12px 16px; min-height: 66px; background: var(--acc-soft); border-color: var(--acc-line); }
+.cont b { display: block; font-size: 17px; } .cont small { color: var(--muted); font-weight: 400; font-size: 12px; }
+.cont svg { width: 30px; height: 30px; fill: var(--acc); flex: none; }
+.panel { background: var(--shade); border: 1px solid var(--line); border-radius: 18px; padding: 12px; }
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; margin: 0 0 10px; background: rgba(0,0,0,.3); border-radius: 12px; }
+.tabs button { min-height: 46px; border: 0; background: transparent; color: var(--muted); border-radius: 9px; line-height: 1.2; }
+.tabs button small { display: block; font-size: 11px; font-weight: 400; opacity: .75; }
+.tabs button[aria-selected="true"] { background: var(--acc); color: var(--acc-ink); }
+.lvgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 8px; }
+.lv { min-height: 58px; padding: 6px 4px; display: grid; place-items: center; align-content: center; border-radius: 12px; line-height: 1.25; }
+.lv b { font-size: 15px; } .lv small { font-size: 11px; color: var(--muted); font-weight: 400; }
+.lv[aria-pressed="true"] { outline: 2px solid var(--acc); outline-offset: -2px; background: var(--acc-soft); }
+#hNote { margin: 0 0 10px; font-size: 13px; color: var(--muted); line-height: 1.5; min-height: 3em; }
+.warnbox { margin: 0 0 12px; font-size: 12px; color: var(--acc); }
+.play { width: 100%; min-height: 56px; font-size: 17px; border-radius: 16px; }
+.hrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.hrow button { display: flex; flex-direction: column; gap: 5px; align-items: center; justify-content: center; min-height: 68px; font-size: 12px; font-weight: 600; }
+.hbest { margin: 0; text-align: center; font-size: 12px; color: var(--muted); } .hbest b { color: var(--acc); }
+.over { position: fixed; inset: 0; z-index: 5000; background: rgba(5,5,10,.74); display: flex; align-items: flex-end; justify-content: center; }
+.over.center { align-items: center; }
+.sheet { width: min(560px, 100%); max-height: 92%; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 18px 18px 0 0; touch-action: pan-y; position: relative;
+  padding: 16px max(16px, env(safe-area-inset-left, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)); }
+.over.center .sheet { border-radius: 18px; max-width: min(380px, calc(100% - 32px)); text-align: center; padding-bottom: 16px; }
+.sheet h2 { margin: 0 0 4px; font: 800 24px/1.1 var(--head); color: var(--acc); }
+.sheet p { margin: 0 0 12px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.sheet p.big { font: 800 38px/1 var(--head); color: var(--acc); margin: 0 0 6px; }
+.sheet p.sc { font-size: 34px; font-weight: 700; color: var(--ink); margin: 0 0 4px; font-variant-numeric: tabular-nums; }
+.sheet .acts { display: grid; gap: 10px; margin-top: 8px; }
+.sheet .acts.two { grid-template-columns: 1fr 1fr; }
+.list { display: grid; gap: 8px; margin: 12px 0; }
+.rec { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.rec .no { font: 800 18px var(--head); color: var(--muted); text-align: center; }
+.rec:first-child .no { color: var(--acc); }
+.rec b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.rec small { display: block; color: var(--muted); font-size: 12px; margin-top: 1px; }
+.rec .badge { font-size: 11px; padding: 3px 8px; border-radius: 999px; background: var(--acc-soft); color: var(--acc); }
+.rec .badge.no2 { background: rgba(255,255,255,.08); color: var(--muted); }
+.empty { text-align: center; color: var(--muted); font-size: 14px; padding: 18px 0; }
+.set { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.set b { display: block; font-size: 15px; } .set small { color: var(--muted); font-size: 12px; }
+.sw { position: relative; width: 54px; min-height: 32px; height: 32px; padding: 0; border-radius: 999px; background: rgba(255,255,255,.14); border: 0; flex: none; }
+.sw::after { content: ''; position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.sw[aria-checked="true"] { background: var(--acc); } .sw[aria-checked="true"]::after { transform: translateX(22px); background: var(--acc-ink); }
+.how { margin: 8px 0 14px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 13px; line-height: 1.7; color: var(--muted); }
+.how b { color: var(--ink); }
+.about { margin: 12px 0 0 !important; font-size: 12px !important; text-align: center; }
+.danger { color: #ff8b7e; border-color: rgba(255,139,126,.4); }
+@media (prefers-reduced-motion: reduce) { * { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+.stat { min-width: 0; }
+@media (max-width: 380px) {
+  .stats { gap: 6px; }
+  .stat { padding: 5px 7px; gap: 4px; }
+  .stat span { font-size: 9.5px; letter-spacing: .02em; }
+  .stat b { font-size: 15px; }
+}
+
+</style>
+</head>
+<body>
+<header>
+  <div class="top"><div class="ttl"><h1 id="gTitle"></h1><span class="chip" id="chip"></span></div><div class="best">Terbaik <b id="best">0</b></div></div>
+  <div class="stats">
+    <div class="stat"><span>Skor</span><b id="score">0</b></div>
+    <div class="stat"><span id="secLbl"></span><b id="second">0</b></div>
+    <div class="stat"><span id="timeLbl">Waktu</span><b id="time">00:00</b></div>
+  </div>
+</header>
+<div id="board"><div id="wm" aria-hidden="true">TweNe</div><div id="stage"></div><div id="tip" hidden></div></div>
+<nav id="nav"></nav>
+<div id="home" hidden>
+  <div class="hwrap">
+    <div class="brand"><div class="hero" id="hero"></div><h1 class="logo" id="hLogo"></h1><p class="by">By TweNe</p></div>
+    <button id="hCont" class="cont" hidden><span><b>Lanjutkan</b><small id="hContInfo"></small></span><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+    <div class="panel">
+      <div class="tabs" id="hTabs" role="tablist"></div>
+      <div class="lvgrid" id="hLv"></div>
+      <p id="hNote"></p>
+      <p class="warnbox" id="hWarn" hidden>Permainan yang sedang berjalan akan diganti dengan yang baru.</p>
+      <button id="hPlay" class="primary play">Main</button>
+    </div>
+    <div class="hrow">
+      <button id="hScore"><svg class="ic" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>Riwayat skor</button>
+      <button id="hHow"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01"/></svg>Cara main</button>
+      <button id="hSet"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>Pengaturan</button>
+    </div>
+    <p class="hbest" id="hBest"></p>
+  </div>
+</div>
+<div id="over" class="over" hidden></div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var nf = function (n) { return Number(n).toLocaleString('id-ID'); };
+  var fmt = function (s) { s = Math.max(0, Math.floor(s)); var m = Math.floor(s / 60), x = s % 60; return (m < 10 ? '0' : '') + m + ':' + (x < 10 ? '0' : '') + x; };
+  var byId = function (a, id) { for (var i = 0; i < a.length; i++) if (a[i].id === id) return a[i]; return a[0]; };
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
+    del: function (k) { try { localStorage.removeItem(k); } catch (e) { /* abaikan */ } }
+  };
+  var G = null, K = function (n) { return G.id + '.' + n + '.v1'; };
+  var MODES = [{ id: 'santai', name: 'Santai', sub: 'tanpa waktu' }, { id: 'pro', name: 'Pro', sub: 'lawan waktu' }];
+  var settings = { sound: true, vibrate: true };
+  var prefs = { mode: 'santai', level: null };
+  var cur = { mode: 'santai', level: null };
+  var playing = false, started = false, over = false, elapsed = 0, lastTick = Date.now(), hud = { score: 0, second: 0 };
+  var stage = $('stage'), tip = $('tip'), overEl = $('over'), home = $('home');
+  var S = window.S = { stage: stage, store: store, nf: nf, fmt: fmt, cur: cur };
+
+  /* ---------- suara ---------- */
+  var SND_ON = '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/>', SND_OFF = '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="m17 9 5 6M22 9l-5 6"/>';
+  var AC = null, master = null;
+  function ac() {
+    if (AC) return AC;
+    try { var C = window.AudioContext || window.webkitAudioContext; if (!C) return null; AC = new C(); master = AC.createGain(); master.gain.value = .55; master.connect(AC.destination); } catch (e) { AC = null; }
+    return AC;
+  }
+  document.addEventListener('pointerdown', function () { var a = ac(); if (a && a.state === 'suspended') a.resume().catch(function () { /* abaikan */ }); }, true);
+  function tone(f, t0, dur, vol, type, to) {
+    var a = AC, o = a.createOscillator(), g = a.createGain(), t = a.currentTime + t0;
+    o.type = type || 'sine'; o.frequency.setValueAtTime(f, t); if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + .02);
+  }
+  var SFX = {
+    click: function () { tone(800, 0, .035, .1, 'square'); },
+    tick: function () { tone(1300, 0, .04, .12, 'square'); },
+    win: function () { [523, 659, 784, 1047, 784, 1047, 1319].forEach(function (f, i) { tone(f, i * .12, .22, .22, 'triangle'); }); },
+    lose: function () { [440, 392, 330, 262].forEach(function (f, i) { tone(f, i * .18, .3, .2, 'sawtooth'); }); }
+  };
+  S.tone = tone; S.addSfx = function (o) { for (var k in o) SFX[k] = o[k]; };
+  S.sounds = [];
+  S.sfx = function (name) {
+    if (!settings.sound) return;
+    S.sounds.push(name); if (S.sounds.length > 80) S.sounds.shift();
+    var a = ac(); if (!a || a.state === 'suspended') return;
+    try { SFX[name](); } catch (e) { /* abaikan */ }
+  };
+  S.buzz = function (p) { if (settings.vibrate && navigator.vibrate) { try { navigator.vibrate(p); } catch (e) { /* abaikan */ } } };
+  function saveSettings() { store.set(K('settings'), JSON.stringify(settings)); nav(); }
+
+  /* ---------- skor ---------- */
+  function loadScores() {
+    var out = { santai: [], pro: [] };
+    try { var o = JSON.parse(store.get(K('scores')) || 'null'); if (o) ['santai', 'pro'].forEach(function (m) { if (Array.isArray(o[m])) out[m] = o[m].filter(function (r) { return r && typeof r.s === 'number'; }); }); } catch (e) { /* kosong */ }
+    return out;
+  }
+  function bestScore(m) { var l = loadScores()[m]; return l.length ? l[0].s : 0; }
+  function refreshBest() { $('best').textContent = nf(bestScore(cur.mode)); }
+
+  /* ---------- timer ---------- */
+  var overlayOpen = function () { return !home.hidden || !overEl.hidden; };
+  var running = function () { return playing && started && !over && !overlayOpen() && !document.hidden; };
+  S.elapsed = function () { return elapsed; };
+  S.remaining = function () { return Math.max(0, cur.level.pro - elapsed); };
+  function renderTime() {
+    var t = $('time');
+    if (cur.mode === 'pro') { var r = S.remaining(); t.textContent = fmt(r); t.classList.toggle('warn', started && r <= 15 && !over); }
+    else { t.textContent = fmt(elapsed); t.classList.remove('warn'); }
+  }
+  setInterval(function () {
+    var now = Date.now(), dt = (now - lastTick) / 1000; lastTick = now;
+    if (!running()) return;
+    elapsed += Math.min(dt, 1); renderTime();
+    if (cur.mode === 'pro' && elapsed >= cur.level.pro) S.finish('time');
+  }, 250);
+
+  /* ---------- HUD & simpan ---------- */
+  S.hud = function (score, second) { hud.score = score; hud.second = second; $('score').textContent = nf(score); $('second').textContent = nf(second); nav(); };
+  S.flash = function (msg) { tip.textContent = msg; tip.hidden = false; clearTimeout(S.flash.h); S.flash.h = setTimeout(function () { tip.hidden = true; }, 1600); };
+  function save() {
+    if (!playing || over) return;
+    var g = G.serialize(); if (!g) return;
+    store.set(K('save'), JSON.stringify({ mode: cur.mode, level: cur.level.id, elapsed: elapsed, started: started, hud: hud, g: g }));
+  }
+  S.save = function () { save(); };
+  S.resetTimer = function () { elapsed = 0; started = false; lastTick = Date.now(); renderTime(); };
+  S.setLevelTime = function (sec) { cur.level.pro = sec; renderTime(); };
+  S.setChip = function (t) { var ch = $('chip'); ch.textContent = byId(MODES, cur.mode).name + ' · ' + t; ch.classList.toggle('pro', cur.mode === 'pro'); };
+  S.moved = function () { if (!started) { started = true; lastTick = Date.now(); } save(); };
+  function loadSaved() {
+    var raw = store.get(K('save')); if (!raw) return null;
+    try {
+      var d = JSON.parse(raw);
+      if (!d || !d.g || typeof d.elapsed !== 'number') return null;
+      var lv = byId(G.levels, d.level); if (lv.id !== d.level) return null;
+      if (d.mode !== 'santai' && d.mode !== 'pro') return null;
+      return d;
+    } catch (e) { return null; }
+  }
+
+  /* ---------- sheet ---------- */
+  function openSheet(html, center) {
+    overEl.className = 'over' + (center ? ' center' : ''); overEl.innerHTML = '<div class="sheet">' + html + '</div>'; overEl.hidden = false;
+    var sh = overEl.firstChild; sh.scrollTop = 0; return sh;
+  }
+  function closeSheet() { overEl.hidden = true; overEl.innerHTML = ''; lastTick = Date.now(); }
+  function confirmSheet(title, text, okLabel, fn, danger) {
+    var sh = openSheet('<h2>' + title + '</h2><p>' + text + '</p><div class="acts two"><button data-a="no">Batal</button><button data-a="ok" class="' + (danger ? 'danger' : 'primary') + '">' + okLabel + '</button></div>', true);
+    sh.querySelector('[data-a="no"]').onclick = closeSheet;
+    sh.querySelector('[data-a="ok"]').onclick = function () { closeSheet(); fn(); };
+  }
+
+  /* ---------- selesai ---------- */
+  S.finish = function (outcome) {
+    if (over || !playing) return;
+    over = true; var score = hud.score;
+    var prev = bestScore(cur.mode), all = loadScores(), l = all[cur.mode];
+    if (score > 0) {
+      l.push({ s: score, lv: cur.level.id, d: Date.now(), o: outcome, x: G.recordLabel ? G.recordLabel() : null });
+      l.sort(function (a, b) { return b.s - a.s || b.d - a.d; }); all[cur.mode] = l.slice(0, 15);
+      store.set(K('scores'), JSON.stringify(all));
+    }
+    store.del(K('save'));
+    refreshBest(); nav();
+    var rec = score > 0 && score > prev;
+    var rt = G.resultText(outcome, score);
+    S.sfx(outcome === 'lose' || outcome === 'time' ? 'lose' : 'win'); S.buzz(outcome === 'win' ? [30, 60, 30] : [60]);
+    setTimeout(function () {
+      var sh = openSheet('<p class="big">' + rt.big + '</p><p class="sc">' + nf(score) + '</p><p>' + (rec ? 'Rekor baru untuk mode ' + byId(MODES, cur.mode).name + '!' : 'Terbaik ' + byId(MODES, cur.mode).name + ': ' + nf(Math.max(prev, score))) + '<br>' + rt.line + '</p>' +
+        '<div class="acts"><button data-a="again" class="primary">Main lagi</button><button data-a="home">Menu utama</button></div>', true);
+      sh.querySelector('[data-a="again"]').onclick = function () { closeSheet(); begin(cur.mode, cur.level, null); };
+      sh.querySelector('[data-a="home"]').onclick = function () { closeSheet(); showHome(); };
+    }, 700);
+  };
+
+  /* ---------- mulai ---------- */
+  function begin(mode, level, saved) {
+    cur.mode = mode; cur.level = level; over = false; playing = true;
+    elapsed = saved ? saved.elapsed : 0; started = saved ? !!saved.started : false; lastTick = Date.now();
+    stage.innerHTML = ''; hud = { score: 0, second: 0 };
+    document.body.classList.remove('at-home'); home.hidden = true;
+    var ch = $('chip'); ch.textContent = byId(MODES, mode).name + ' · ' + level.name; ch.classList.toggle('pro', mode === 'pro');
+    $('timeLbl').textContent = mode === 'pro' ? 'Sisa' : 'Waktu';
+    G.start({ mode: mode, level: level, saved: saved ? saved.g : null, stage: stage });
+    if (saved && saved.hud) S.hud(saved.hud.score, saved.hud.second);
+    renderTime(); refreshBest(); nav(); save();
+    prefs.mode = mode; prefs.level = level.id; store.set(K('prefs'), JSON.stringify(prefs));
+  }
+  S.cur = cur; S.openSheet = openSheet; S.closeSheet = closeSheet;
+
+  /* ---------- navigasi bawah ---------- */
+  function nav() {
+    var n = $('nav'), html = '';
+    var ic = function (id, label, path, extra) { return '<button id="' + id + '" aria-label="' + label + '" title="' + label + '"' + (extra || '') + '><svg class="ic" viewBox="0 0 24 24">' + path + '</svg></button>'; };
+    if (G.hasUndo) html += ic('nUndo', 'Urungkan langkah', '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>', (cur.mode === 'santai' && G.canUndo()) ? '' : ' disabled');
+    if (G.allowEnd) html += ic('nEnd', 'Akhiri dan catat skor', '<path d="M5 21V4M5 5h12l-2 4 2 4H5"/>', (playing && !over && hud.score > 0) ? '' : ' disabled');
+    html += ic('nAgain', 'Main baru', '<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/>');
+    html += ic('nSnd', settings.sound ? 'Matikan suara' : 'Nyalakan suara', settings.sound ? SND_ON : SND_OFF, ' aria-pressed="' + (!settings.sound) + '"');
+    html += ic('nHome', 'Menu utama', '<path d="M4 11 12 4l8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-6h4v6"/>');
+    n.innerHTML = html;
+    var b = function (id, fn) { var e = $(id); if (e) e.onclick = fn; };
+    b('nUndo', function () { if (cur.mode === 'santai' && G.canUndo()) { G.undo(); S.sfx('click'); save(); } });
+    b('nEnd', function () { confirmSheet('Akhiri permainan?', 'Skor ' + nf(hud.score) + ' akan dicatat ke riwayat.', 'Akhiri', function () { S.finish('end'); }); });
+    b('nAgain', function () { confirmSheet('Main baru?', 'Permainan ini tidak akan dicatat ke riwayat.', 'Main baru', function () { begin(cur.mode, cur.level, null); }); });
+    b('nSnd', function () { settings.sound = !settings.sound; saveSettings(); if (settings.sound) S.sfx('click'); });
+    b('nHome', showHome);
+  }
+  S.refreshNav = nav;
+
+  /* ---------- beranda ---------- */
+  var hSel = { mode: 'santai', level: null };
+  function showHome() {
+    var sv = loadSaved(), cont = $('hCont');
+    if (playing && !over) save();
+    if (!playing || over) { /* simpanan di storage */ } 
+    document.body.classList.add('at-home'); home.hidden = false; closeSheet();
+    hSel.mode = hSel.mode || 'santai';
+    renderHome(sv);
+    home.scrollTop = 0;
+  }
+  function renderHome(sv) {
+    var tabs = $('hTabs'); tabs.innerHTML = '';
+    MODES.forEach(function (m) {
+      var b = document.createElement('button'); b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(hSel.mode === m.id));
+      b.innerHTML = m.name + '<small>' + m.sub + '</small>'; b.onclick = function () { hSel.mode = m.id; S.sfx('click'); renderHome(sv); };
+      tabs.appendChild(b);
+    });
+    var lv = $('hLv'); lv.innerHTML = ''; lv.hidden = !!G.noLevels;
+    if (!G.noLevels) G.levels.forEach(function (l) {
+      var b = document.createElement('button'); b.className = 'lv'; b.setAttribute('aria-pressed', String(hSel.level === l.id));
+      b.innerHTML = '<b>' + l.name + '</b><small>' + l.sub + '</small>'; b.onclick = function () { hSel.level = l.id; S.sfx('click'); renderHome(sv); };
+      lv.appendChild(b);
+    });
+    var L = byId(G.levels, hSel.level);
+    if (G.homeNote) $('hNote').textContent = G.homeNote(hSel.mode); else $('hNote').textContent = L.desc + (hSel.mode === 'pro' ? ' Waktu ' + fmt(L.pro) + ', skor dihitung saat waktu habis atau permainan selesai.' : ' Tanpa batas waktu.');
+    var cont = $('hCont');
+    cont.hidden = !sv;
+    if (sv) { var sl = byId(G.levels, sv.level); $('hContInfo').textContent = byId(MODES, sv.mode).name + ' · ' + (G.label ? G.label(sv.g) : sl.name) + ' · skor ' + nf(sv.hud ? sv.hud.score : 0); cont.onclick = function () { begin(sv.mode, sl, sv); hSel.mode = sv.mode; hSel.level = sv.level; }; }
+    $('hWarn').hidden = !sv;
+    $('hPlay').onclick = function () { S.sfx('click'); begin(hSel.mode, L, null); };
+    $('hBest').innerHTML = 'Terbaik · Santai <b>' + nf(bestScore('santai')) + '</b> · Pro <b>' + nf(bestScore('pro')) + '</b>';
+  }
+  $('hScore').onclick = function () {
+    var tab = hSel.mode;
+    (function draw() {
+      var all = loadScores(), l = all[tab];
+      var rows = l.length ? l.map(function (r, i) {
+        var d = new Date(r.d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+        var out = r.o === 'win' ? 'Selesai' : r.o === 'time' ? 'Waktu habis' : r.o === 'lose' ? 'Buntu' : 'Diakhiri';
+        return '<div class="rec"><span class="no">' + (i + 1) + '</span><div><b>' + nf(r.s) + '</b><small>' + (r.x || byId(G.levels, r.lv).name) + ' · ' + d + '</small></div><span class="badge' + (r.o === 'win' ? '' : ' no2') + '">' + out + '</span></div>';
+      }).join('') : '<p class="empty">Belum ada skor. Main dulu, nanti tercatat di sini.</p>';
+      var sh = openSheet('<h2>Riwayat skor</h2><div class="tabs" role="tablist" style="margin-top:10px">' + MODES.map(function (m) { return '<button role="tab" data-m="' + m.id + '" aria-selected="' + (tab === m.id) + '">' + m.name + '</button>'; }).join('') + '</div><div class="list">' + rows + '</div><div class="acts"><button data-a="x">Tutup</button></div>');
+      sh.querySelector('[data-a="x"]').onclick = closeSheet;
+      [].forEach.call(sh.querySelectorAll('[data-m]'), function (b) { b.onclick = function () { tab = b.getAttribute('data-m'); draw(); }; });
+    })();
+  };
+  $('hHow').onclick = function () {
+    var sh = openSheet('<h2>Cara main</h2><div class="how">' + G.howto + '</div><div class="acts"><button data-a="x" class="primary">Mengerti</button></div>');
+    sh.querySelector('[data-a="x"]').onclick = closeSheet;
+  };
+  $('hSet').onclick = function () {
+    (function draw() {
+      var sw = function (id, t, d, on) { return '<div class="set"><span><b>' + t + '</b><small>' + d + '</small></span><button class="sw" id="' + id + '" role="switch" aria-checked="' + on + '" aria-label="' + t + '"></button></div>'; };
+      var sh = openSheet('<h2>Pengaturan</h2>' + sw('sSnd', 'Suara', 'Efek bunyi saat bermain', settings.sound) + sw('sVib', 'Getar', 'Getaran di HP yang mendukung', settings.vibrate) +
+        '<div class="set"><span><b>Hapus data</b><small>Riwayat skor, permainan tersimpan, dan pengaturan</small></span><button id="sWipe" class="danger" style="min-height:40px">Hapus</button></div>' +
+        '<p class="about">' + G.title + ' · By TweNe</p><div class="acts"><button data-a="x" class="primary">Tutup</button></div>');
+      sh.querySelector('[data-a="x"]').onclick = closeSheet;
+      $('sSnd').onclick = function () { settings.sound = !settings.sound; saveSettings(); if (settings.sound) S.sfx('click'); draw(); };
+      $('sVib').onclick = function () { settings.vibrate = !settings.vibrate; saveSettings(); if (settings.vibrate) S.buzz(20); draw(); };
+      $('sWipe').onclick = function () {
+        confirmSheet('Hapus semua data?', 'Riwayat skor dan permainan tersimpan akan hilang. Tindakan ini tidak bisa dibatalkan.', 'Hapus', function () {
+          ['scores', 'save', 'prefs', 'settings'].forEach(function (k) { store.del(K(k)); });
+          settings.sound = true; settings.vibrate = true; playing = false; over = false; stage.innerHTML = '';
+          showHome(); S.flash('Data dihapus');
+        }, true);
+      };
+    })();
+  };
+
+  /* ---------- boot ---------- */
+  S.boot = function (game) {
+    G = game; $('gTitle').textContent = G.short || G.title; $('hLogo').textContent = G.title; $('secLbl').textContent = G.secondLabel;
+    document.title = G.title + ' TweNe';
+    try { var o = JSON.parse(store.get(K('settings')) || 'null'); if (o) { if (typeof o.sound === 'boolean') settings.sound = o.sound; if (typeof o.vibrate === 'boolean') settings.vibrate = o.vibrate; } } catch (e) { /* bawaan */ }
+    try { var p = JSON.parse(store.get(K('prefs')) || 'null'); if (p) { if (p.mode === 'santai' || p.mode === 'pro') prefs.mode = p.mode; if (p.level) prefs.level = p.level; } } catch (e) { /* bawaan */ }
+    prefs.level = byId(G.levels, prefs.level).id; hSel.mode = prefs.mode; hSel.level = prefs.level;
+    cur.level = byId(G.levels, prefs.level); cur.mode = prefs.mode;
+    G.hero($('hero'));
+    var sv = loadSaved();
+    nav(); refreshBest(); showHome();
+    var ro = window.ResizeObserver ? new ResizeObserver(function () { if (playing && G.relayout) G.relayout(); }) : null;
+    if (ro) ro.observe($('board')); else window.addEventListener('resize', function () { if (playing && G.relayout) G.relayout(); });
+    document.addEventListener('visibilitychange', function () { lastTick = Date.now(); if (document.hidden) save(); });
+    window.addEventListener('pagehide', save);
+    S.debug = { state: function () { return { playing: playing, started: started, over: over, elapsed: elapsed, mode: cur.mode, hud: hud }; } };
+  };
+})();
+
+</script>
+<script>
+(function () {
+  'use strict';
+  var S = window.S;
+  var LEVELS = [
+    { id: 'mudah', name: 'Mudah', sub: 'papan 5×5', n: 5, stones: 0, pro: 240, desc: 'Papan 5×5 yang lega, cocok buat pemanasan.' },
+    { id: 'normal', name: 'Normal', sub: 'papan 4×4', n: 4, stones: 0, pro: 180, desc: 'Papan 4×4 seperti 2048 klasik.' },
+    { id: 'sulit', name: 'Sulit', sub: '4×4 + batu', n: 4, stones: 2, pro: 150, desc: 'Papan 4×4 dengan 2 batu yang menghalangi geseran.' }
+  ];
+  var st = null, nextId = 1, hist = [], busy = false, el = null, els = {}, cell = 0, gap = 8, side = 0, wonShown = false;
+  var STONE = -1;
+
+  function hue(v) { var i = Math.min(12, Math.round(Math.log(v) / Math.LN2)); var t = (i - 1) / 10; if (t > 1) t = 1; return Math.round(218 - t * 183); }
+  function light(v) { var i = Math.min(12, Math.round(Math.log(v) / Math.LN2)); return Math.round(30 + Math.min(1, (i - 1) / 10) * 26); }
+  function fsz(v) { var d = String(v).length; return Math.round(cell * (d <= 2 ? .46 : d === 3 ? .38 : d === 4 ? .3 : .24)); }
+
+  function emptyCells() {
+    var occ = {}, out = [], i, j;
+    st.tiles.forEach(function (t) { occ[t.r + ',' + t.c] = 1; });
+    st.stones.forEach(function (p) { occ[p[0] + ',' + p[1]] = 1; });
+    for (i = 0; i < st.n; i++) for (j = 0; j < st.n; j++) if (!occ[i + ',' + j]) out.push([i, j]);
+    return out;
+  }
+  function spawn() {
+    var e = emptyCells(); if (!e.length) return null;
+    var p = e[Math.floor(Math.random() * e.length)], t = { id: nextId++, v: Math.random() < .9 ? 2 : 4, r: p[0], c: p[1], fresh: 1 };
+    st.tiles.push(t); return t;
+  }
+  function fresh(level) {
+    st = { n: level.n, tiles: [], stones: [], score: 0, moves: 0 };
+    var i, e;
+    for (i = 0; i < level.stones; i++) { e = emptyCells(); var p = e[Math.floor(Math.random() * e.length)]; st.stones.push(p); }
+    spawn(); spawn();
+  }
+  function valid(d, level) {
+    if (!d || d.n !== level.n || !Array.isArray(d.tiles) || !Array.isArray(d.stones)) return false;
+    var seen = {};
+    for (var i = 0; i < d.tiles.length; i++) {
+      var t = d.tiles[i];
+      if (!t || typeof t.v !== 'number' || t.v < 2 || (t.v & (t.v - 1)) || t.r < 0 || t.c < 0 || t.r >= d.n || t.c >= d.n || seen[t.r + ',' + t.c]) return false;
+      seen[t.r + ',' + t.c] = 1;
+    }
+    for (var k = 0; k < d.stones.length; k++) { var s = d.stones[k]; if (!s || seen[s[0] + ',' + s[1]]) return false; seen[s[0] + ',' + s[1]] = 1; }
+    return typeof d.score === 'number';
+  }
+
+  /* ---- tampilan ---- */
+  function build() {
+    S.stage.innerHTML = ''; els = {};
+    el = document.createElement('div'); el.className = 'g2'; S.stage.appendChild(el);
+    for (var i = 0; i < st.n * st.n; i++) { var c = document.createElement('div'); c.className = 'cell'; c.dataset.i = i; el.appendChild(c); }
+    st.stones.forEach(function (p) { var s = document.createElement('div'); s.className = 'stone'; s.dataset.r = p[0]; s.dataset.c = p[1]; s.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>'; el.appendChild(s); });
+    st.tiles.forEach(function (t) { mk(t, false); });
+    layout();
+  }
+  function mk(t, anim) {
+    var d = document.createElement('div'); d.className = 't' + (anim ? (t.merged ? ' pop' : ' spawn') : ''); d.textContent = t.v; els[t.id] = d; el.appendChild(d); style(t, d); return d;
+  }
+  function style(t, d) {
+    d = d || els[t.id]; if (!d) return;
+    d.style.setProperty('--h', hue(t.v)); d.style.setProperty('--l', light(t.v) + '%');
+    d.style.width = d.style.height = cell + 'px'; d.style.fontSize = fsz(t.v) + 'px';
+    d.style.transform = 'translate(' + (gap + t.c * (cell + gap)) + 'px,' + (gap + t.r * (cell + gap)) + 'px)';
+    d.classList.toggle('big', t.v >= 128);
+  }
+  function layout() {
+    if (!el) return;
+    var r = S.stage.getBoundingClientRect(), n = st.n;
+    side = Math.max(120, Math.floor(Math.min(r.width, r.height) - 4)); gap = Math.max(5, Math.round(side / (n * 12)));
+    cell = Math.floor((side - gap * (n + 1)) / n); side = cell * n + gap * (n + 1);
+    el.style.width = el.style.height = side + 'px'; el.style.marginLeft = el.style.marginTop = (-side / 2) + 'px';
+    [].forEach.call(el.querySelectorAll('.cell'), function (c) { var i = +c.dataset.i, rr = Math.floor(i / n), cc = i % n; c.style.width = c.style.height = cell + 'px'; c.style.transform = 'translate(' + (gap + cc * (cell + gap)) + 'px,' + (gap + rr * (cell + gap)) + 'px)'; });
+    [].forEach.call(el.querySelectorAll('.stone'), function (s) { s.style.width = s.style.height = cell + 'px'; s.style.transform = 'translate(' + (gap + (+s.dataset.c) * (cell + gap)) + 'px,' + (gap + (+s.dataset.r) * (cell + gap)) + 'px)'; });
+    st.tiles.forEach(function (t) { style(t); });
+  }
+
+  /* ---- logika ---- */
+  function lines(dir) {
+    var n = st.n, out = [], i, j, line;
+    for (i = 0; i < n; i++) {
+      line = [];
+      for (j = 0; j < n; j++) {
+        if (dir === 0) line.push([i, j]); else if (dir === 2) line.push([i, n - 1 - j]);
+        else if (dir === 1) line.push([j, i]); else line.push([n - 1 - j, i]);
+      }
+      out.push(line);
+    }
+    return out;
+  }
+  function snapshot() { return JSON.stringify({ tiles: st.tiles, score: st.score, moves: st.moves }); }
+  function move(dir) {
+    if (busy || !st || S.stageLocked) return;
+    var n = st.n, grid = [], i, j, moved = false, gained = 0, merges = [];
+    for (i = 0; i < n; i++) { grid.push([]); for (j = 0; j < n; j++) grid[i].push(null); }
+    st.tiles.forEach(function (t) { grid[t.r][t.c] = t; });
+    st.stones.forEach(function (p) { grid[p[0]][p[1]] = STONE; });
+    var before = snapshot();
+    lines(dir).forEach(function (line) {
+      var a = 0;
+      while (a < line.length) {
+        if (grid[line[a][0]][line[a][1]] === STONE) { a++; continue; }
+        var b = a; while (b < line.length && grid[line[b][0]][line[b][1]] !== STONE) b++;
+        var seg = line.slice(a, b), ts = seg.map(function (p) { return grid[p[0]][p[1]]; }).filter(Boolean), pos = 0, k;
+        for (k = 0; k < ts.length; k++) {
+          var t = ts[k], tg = seg[pos];
+          if (k + 1 < ts.length && ts[k + 1].v === t.v) {
+            var u = ts[k + 1]; t.nr = u.nr = tg[0]; t.nc = u.nc = tg[1];
+            merges.push({ a: t, b: u, r: tg[0], c: tg[1], v: t.v * 2 }); gained += t.v * 2; moved = true; k++;
+          } else { if (t.r !== tg[0] || t.c !== tg[1]) moved = true; t.nr = tg[0]; t.nc = tg[1]; }
+          pos++;
+        }
+        a = b;
+      }
+    });
+    if (!moved) { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); S.sfx('nope'); return; }
+    hist.push(before); if (hist.length > 12) hist.shift();
+    busy = true;
+    var gone = {};
+    merges.forEach(function (m) { gone[m.a.id] = 1; gone[m.b.id] = 1; });
+    st.tiles.forEach(function (t) { t.r = t.nr; t.c = t.nc; delete t.nr; delete t.nc; style(t); });
+    var oldEls = merges.reduce(function (o, m) { o.push(els[m.a.id], els[m.b.id]); return o; }, []);
+    st.tiles = st.tiles.filter(function (t) { return !gone[t.id]; });
+    var biggest = 0;
+    merges.forEach(function (m) { var nt = { id: nextId++, v: m.v, r: m.r, c: m.c, merged: 1 }; st.tiles.push(nt); setTimeout(function () { mk(nt, true); }, 110); if (m.v > biggest) biggest = m.v; });
+    var sp = spawn(); if (sp) setTimeout(function () { mk(sp, true); }, 110);
+    setTimeout(function () { oldEls.forEach(function (e) { if (e && e.parentNode) e.parentNode.removeChild(e); }); }, 120);
+    st.score += gained; st.moves++;
+    S.hud(st.score, st.moves);
+    S.sfx(merges.length ? 'merge' : 'slide'); if (merges.length) S.buzz(12);
+    S.moved();
+    if (!wonShown && st.tiles.some(function (t) { return t.v >= 2048; })) { wonShown = true; S.flash('2048! Lanjut terus kalau mau.'); S.sfx('win'); }
+    setTimeout(function () { busy = false; if (!canMove()) { S.sfx('lose'); S.finish('lose'); } }, 130);
+  }
+  function canMove() {
+    if (emptyCells().length) return true;
+    var g = {}; st.tiles.forEach(function (t) { g[t.r + ',' + t.c] = t.v; });
+    for (var i = 0; i < st.n; i++) for (var j = 0; j < st.n; j++) {
+      var v = g[i + ',' + j]; if (v === undefined) continue;
+      if (g[i + ',' + (j + 1)] === v || g[(i + 1) + ',' + j] === v) return true;
+    }
+    return false;
+  }
+  function maxTile() { return st.tiles.reduce(function (m, t) { return Math.max(m, t.v); }, 0); }
+
+  /* ---- input ---- */
+  var sx = 0, sy = 0, down = false;
+  document.addEventListener('keydown', function (e) {
+    if (!st || !el || !document.getElementById('home').hidden || !document.getElementById('over').hidden) return;
+    var d = { ArrowLeft: 0, ArrowUp: 1, ArrowRight: 2, ArrowDown: 3, a: 0, w: 1, d: 2, s: 3 }[e.key];
+    if (d !== undefined) { e.preventDefault(); move(d); }
+  });
+  S.stage.addEventListener('pointerdown', function (e) { down = true; sx = e.clientX; sy = e.clientY; });
+  S.stage.addEventListener('pointerup', function (e) {
+    if (!down) return; down = false;
+    var dx = e.clientX - sx, dy = e.clientY - sy, ax = Math.abs(dx), ay = Math.abs(dy);
+    if (Math.max(ax, ay) < 22) return;
+    move(ax > ay ? (dx < 0 ? 0 : 2) : (dy < 0 ? 1 : 3));
+  });
+  S.stage.addEventListener('pointercancel', function () { down = false; });
+
+  S.addSfx({
+    slide: function () { S.tone(220, 0, .07, .12, 'triangle', 160); },
+    merge: function () { S.tone(392, 0, .09, .2, 'triangle'); S.tone(587, .05, .12, .2, 'triangle'); },
+    nope: function () { S.tone(140, 0, .12, .18, 'sawtooth', 100); }
+  });
+
+  S.boot({
+    id: 'g2048', title: '2048', secondLabel: 'Langkah', levels: LEVELS, hasUndo: true, allowEnd: true,
+    howto: '<b>Geser</b> papan ke atas, bawah, kiri, atau kanan. Semua kotak ikut bergeser.<br><b>Kotak sama</b> yang bertabrakan bergabung dan nilainya berlipat. Skor bertambah sebesar nilai gabungan.<br>Capai <b>2048</b>, lalu lanjut sejauh mungkin.<br><b>Santai</b> boleh urungkan langkah dan tanpa waktu. <b>Pro</b> dibatasi waktu dan tanpa urungkan.<br>Di level <b>Sulit</b>, batu tidak bisa bergeser dan memisahkan barisan.',
+    start: function (ctx) {
+      busy = false; hist = []; wonShown = false; nextId = 1;
+      if (ctx.saved && valid(ctx.saved, ctx.level)) { st = ctx.saved; st.tiles.forEach(function (t) { t.id = nextId++; delete t.fresh; delete t.merged; }); } else fresh(ctx.level);
+      build(); S.hud(st.score, st.moves);
+    },
+    relayout: layout,
+    serialize: function () { return st ? { n: st.n, tiles: st.tiles.map(function (t) { return { v: t.v, r: t.r, c: t.c }; }), stones: st.stones, score: st.score, moves: st.moves } : null; },
+    canUndo: function () { return !!st && hist.length > 0; },
+    undo: function () {
+      if (busy) return; var h = hist.pop(); if (!h) return; var o = JSON.parse(h);
+      st.tiles = o.tiles.map(function (t) { return { id: nextId++, v: t.v, r: t.r, c: t.c }; }); st.score = o.score; st.moves = o.moves;
+      build(); S.hud(st.score, st.moves);
+    },
+    resultText: function (outcome) {
+      var mt = st ? maxTile() : 0, tail = 'Kotak tertinggi ' + mt + ' dalam ' + (st ? st.moves : 0) + ' langkah.';
+      return outcome === 'lose' ? { big: 'Buntu!', line: tail } : outcome === 'time' ? { big: 'Waktu habis', line: tail } : { big: 'Selesai', line: tail };
+    },
+    hero: function (h) {
+      h.innerHTML = '<div class="hero2">' + [2, 8, 64, 512].map(function (v) { return '<div class="t" style="--h:' + hue(v) + ';--l:' + light(v) + '%">' + v + '</div>'; }).join('') + '</div>';
+    }
+  });
+})();
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#120a1b">
+<title>Memory Match TweNe</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&display=swap">
+<style>
+/* Tata letak: satu layar. Kartu tersusun rapi di tengah papan, HUD di atas, tombol di bawah. Tema: ungu buah pekat dengan aksen persik. */
+:root {
+  --bg1: #2a1b3a; --bg2: #120a1b; --ink: #f6eef4; --muted: #b3a2bd; --acc: #ffb48a; --acc-ink: #2d1306;
+  --acc-soft: rgba(255,180,138,.14); --acc-line: rgba(255,180,138,.5);
+  --panel: #1a1026; --line: rgba(255,255,255,.13); --shade: rgba(0,0,0,.3);
+  --head: 'Bricolage Grotesque', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; --ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: dark;
+}
+.mgrid { position: absolute; left: 50%; top: 50%; display: grid; touch-action: manipulation; }
+.mc { position: relative; padding: 0; min-height: 0; border: 0; background: none; border-radius: 12px; perspective: 600px; cursor: pointer; }
+.mc:active { transform: none; }
+.mc .in { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform .35s cubic-bezier(.3,.7,.3,1); border-radius: 12px; }
+.mc.up .in { transform: rotateY(180deg); }
+.mc .f { position: absolute; inset: 0; border-radius: 12px; backface-visibility: hidden; -webkit-backface-visibility: hidden; display: grid; place-items: center; }
+.mc .back { background: repeating-linear-gradient(45deg, #3b2753 0 7px, #342048 7px 14px); border: 2px solid rgba(255,180,138,.28); box-shadow: 0 3px 0 rgba(0,0,0,.35); }
+.mc .back::after { content: ''; width: 34%; aspect-ratio: 1; border-radius: 50%; border: 2px solid rgba(255,180,138,.4); }
+.mc .front { transform: rotateY(180deg); background: #f7efe4; box-shadow: 0 3px 0 rgba(0,0,0,.3); }
+.mc .front svg { width: 62%; height: 62%; fill: currentColor; }
+.mc.ok .front { background: #fff7ea; box-shadow: 0 0 0 3px var(--acc), 0 0 22px rgba(255,180,138,.55); }
+.mc.ok .in { animation: hop .4s ease-out; }
+@keyframes hop { 40% { translate: 0 -8px; } }
+.mc.bad .front { animation: wiggle .3s; }
+@keyframes wiggle { 25% { translate: -4px 0 } 75% { translate: 4px 0 } }
+.hero3 { position: relative; height: 100%; display: flex; justify-content: center; align-items: flex-end; gap: 10px; }
+.hero3 .mc { width: 52px; height: 68px; perspective: 400px; animation: bob 3s ease-in-out infinite; }
+.hero3 .mc:nth-child(2) { animation-delay: -.7s; } .hero3 .mc:nth-child(3) { animation-delay: -1.4s; } .hero3 .mc:nth-child(4) { animation-delay: -2.1s; }
+.hero3 .mc .in { animation: flipper 4.8s ease-in-out infinite; }
+.hero3 .mc:nth-child(2) .in { animation-delay: -1.2s; } .hero3 .mc:nth-child(3) .in { animation-delay: -2.4s; } .hero3 .mc:nth-child(4) .in { animation-delay: -3.6s; }
+@keyframes flipper { 0%, 35% { transform: rotateY(0); } 45%, 80% { transform: rotateY(180deg); } 90%, 100% { transform: rotateY(360deg); } }
+@keyframes bob { 50% { translate: 0 -8px; } }
+
+.mc.mix .in { animation: mixed .5s ease-out; }
+@keyframes mixed { 20% { transform: rotate(-6deg) scale(.94); } 60% { transform: rotate(5deg) scale(.94); } }
+
+[hidden] { display: none !important; }
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; overflow: hidden; color: var(--ink); font-family: var(--ui);
+  background: radial-gradient(ellipse at 50% 20%, var(--bg1) 0%, var(--bg2) 88%) center / cover no-repeat var(--bg2);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 10px; display: flex; flex-direction: column; gap: 10px;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+header { display: flex; flex-direction: column; gap: 8px; flex: none; }
+.top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.ttl { display: flex; align-items: center; gap: 8px; min-width: 0; }
+h1 { margin: 0; white-space: nowrap; font: 800 22px/1 var(--head); color: var(--acc); letter-spacing: -.01em; }
+.chip { font-size: 11px; font-weight: 600; letter-spacing: .03em; color: var(--ink); border: 1px solid var(--line); background: var(--shade); border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+.chip.pro { color: var(--acc-ink); background: var(--acc); border-color: transparent; }
+.best { white-space: nowrap; font-size: 12px; background: var(--shade); border-radius: 999px; padding: 4px 10px; font-variant-numeric: tabular-nums; }
+.best b { color: var(--acc); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat { background: var(--shade); border: 1px solid var(--line); border-radius: 10px; padding: 5px 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.stat span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.stat b { font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.stat b.warn { color: #ff8b7e; animation: blink 1s steps(2, jump-none) infinite; }
+@keyframes blink { 50% { opacity: .45; } }
+#board { position: relative; flex: 1; min-height: 0; touch-action: none; }
+#stage { position: absolute; inset: 0; z-index: 1; }
+#wm { position: absolute; left: 0; right: 0; bottom: 2%; text-align: center; pointer-events: none; z-index: 0; font: 800 clamp(56px, 24vw, 130px)/1 var(--head); letter-spacing: -.02em; color: rgba(255,255,255,.05); }
+body.at-home header, body.at-home #board, body.at-home nav { visibility: hidden; }
+#tip { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 20; background: rgba(8,8,14,.92); border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; font-size: 13px; white-space: nowrap; }
+nav { display: flex; gap: 8px; flex: none; }
+nav button { flex: 1; display: grid; place-items: center; }
+button { font: 600 15px var(--ui); color: var(--ink); background: var(--shade); border: 1px solid var(--line); border-radius: 14px; min-height: 52px; padding: 0 12px; cursor: pointer; }
+button:active { transform: scale(.96); }
+button:disabled { opacity: .4; cursor: default; }
+button:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+button.primary { background: var(--acc); color: var(--acc-ink); border-color: transparent; }
+svg.ic { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+#home { position: fixed; inset: 0; z-index: 4000; overflow-y: auto; display: flex;
+  background: radial-gradient(ellipse at 50% 20%, var(--bg1) 0%, var(--bg2) 88%) center / cover no-repeat var(--bg2);
+  padding: max(18px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(18px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.hwrap { width: min(420px, 100%); margin: auto; display: flex; flex-direction: column; gap: 14px; }
+.brand { text-align: center; }
+.hero { position: relative; height: 112px; width: 240px; margin: 0 auto; }
+.logo { margin: 10px 0 0; font: 800 min(50px, 10.6vw)/1.05 var(--head); color: var(--acc); letter-spacing: -.02em; }
+.by { margin: 6px 0 0; color: var(--muted); font-size: 13px; letter-spacing: .06em; }
+.cont { display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: left; padding: 12px 16px; min-height: 66px; background: var(--acc-soft); border-color: var(--acc-line); }
+.cont b { display: block; font-size: 17px; } .cont small { color: var(--muted); font-weight: 400; font-size: 12px; }
+.cont svg { width: 30px; height: 30px; fill: var(--acc); flex: none; }
+.panel { background: var(--shade); border: 1px solid var(--line); border-radius: 18px; padding: 12px; }
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; margin: 0 0 10px; background: rgba(0,0,0,.3); border-radius: 12px; }
+.tabs button { min-height: 46px; border: 0; background: transparent; color: var(--muted); border-radius: 9px; line-height: 1.2; }
+.tabs button small { display: block; font-size: 11px; font-weight: 400; opacity: .75; }
+.tabs button[aria-selected="true"] { background: var(--acc); color: var(--acc-ink); }
+.lvgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 8px; }
+.lv { min-height: 58px; padding: 6px 4px; display: grid; place-items: center; align-content: center; border-radius: 12px; line-height: 1.25; }
+.lv b { font-size: 15px; } .lv small { font-size: 11px; color: var(--muted); font-weight: 400; }
+.lv[aria-pressed="true"] { outline: 2px solid var(--acc); outline-offset: -2px; background: var(--acc-soft); }
+#hNote { margin: 0 0 10px; font-size: 13px; color: var(--muted); line-height: 1.5; min-height: 3em; }
+.warnbox { margin: 0 0 12px; font-size: 12px; color: var(--acc); }
+.play { width: 100%; min-height: 56px; font-size: 17px; border-radius: 16px; }
+.hrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.hrow button { display: flex; flex-direction: column; gap: 5px; align-items: center; justify-content: center; min-height: 68px; font-size: 12px; font-weight: 600; }
+.hbest { margin: 0; text-align: center; font-size: 12px; color: var(--muted); } .hbest b { color: var(--acc); }
+.over { position: fixed; inset: 0; z-index: 5000; background: rgba(5,5,10,.74); display: flex; align-items: flex-end; justify-content: center; }
+.over.center { align-items: center; }
+.sheet { width: min(560px, 100%); max-height: 92%; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 18px 18px 0 0; touch-action: pan-y; position: relative;
+  padding: 16px max(16px, env(safe-area-inset-left, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)); }
+.over.center .sheet { border-radius: 18px; max-width: min(380px, calc(100% - 32px)); text-align: center; padding-bottom: 16px; }
+.sheet h2 { margin: 0 0 4px; font: 800 24px/1.1 var(--head); color: var(--acc); }
+.sheet p { margin: 0 0 12px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.sheet p.big { font: 800 38px/1 var(--head); color: var(--acc); margin: 0 0 6px; }
+.sheet p.sc { font-size: 34px; font-weight: 700; color: var(--ink); margin: 0 0 4px; font-variant-numeric: tabular-nums; }
+.sheet .acts { display: grid; gap: 10px; margin-top: 8px; }
+.sheet .acts.two { grid-template-columns: 1fr 1fr; }
+.list { display: grid; gap: 8px; margin: 12px 0; }
+.rec { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.rec .no { font: 800 18px var(--head); color: var(--muted); text-align: center; }
+.rec:first-child .no { color: var(--acc); }
+.rec b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.rec small { display: block; color: var(--muted); font-size: 12px; margin-top: 1px; }
+.rec .badge { font-size: 11px; padding: 3px 8px; border-radius: 999px; background: var(--acc-soft); color: var(--acc); }
+.rec .badge.no2 { background: rgba(255,255,255,.08); color: var(--muted); }
+.empty { text-align: center; color: var(--muted); font-size: 14px; padding: 18px 0; }
+.set { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.set b { display: block; font-size: 15px; } .set small { color: var(--muted); font-size: 12px; }
+.sw { position: relative; width: 54px; min-height: 32px; height: 32px; padding: 0; border-radius: 999px; background: rgba(255,255,255,.14); border: 0; flex: none; }
+.sw::after { content: ''; position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.sw[aria-checked="true"] { background: var(--acc); } .sw[aria-checked="true"]::after { transform: translateX(22px); background: var(--acc-ink); }
+.how { margin: 8px 0 14px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 13px; line-height: 1.7; color: var(--muted); }
+.how b { color: var(--ink); }
+.about { margin: 12px 0 0 !important; font-size: 12px !important; text-align: center; }
+.danger { color: #ff8b7e; border-color: rgba(255,139,126,.4); }
+@media (prefers-reduced-motion: reduce) { * { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+.stat { min-width: 0; }
+@media (max-width: 380px) {
+  .stats { gap: 6px; }
+  .stat { padding: 5px 7px; gap: 4px; }
+  .stat span { font-size: 9.5px; letter-spacing: .02em; }
+  .stat b { font-size: 15px; }
+}
+
+</style>
+</head>
+<body>
+<header>
+  <div class="top"><div class="ttl"><h1 id="gTitle"></h1><span class="chip" id="chip"></span></div><div class="best">Terbaik <b id="best">0</b></div></div>
+  <div class="stats">
+    <div class="stat"><span>Skor</span><b id="score">0</b></div>
+    <div class="stat"><span id="secLbl"></span><b id="second">0</b></div>
+    <div class="stat"><span id="timeLbl">Waktu</span><b id="time">00:00</b></div>
+  </div>
+</header>
+<div id="board"><div id="wm" aria-hidden="true">TweNe</div><div id="stage"></div><div id="tip" hidden></div></div>
+<nav id="nav"></nav>
+<div id="home" hidden>
+  <div class="hwrap">
+    <div class="brand"><div class="hero" id="hero"></div><h1 class="logo" id="hLogo"></h1><p class="by">By TweNe</p></div>
+    <button id="hCont" class="cont" hidden><span><b>Lanjutkan</b><small id="hContInfo"></small></span><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+    <div class="panel">
+      <div class="tabs" id="hTabs" role="tablist"></div>
+      <div class="lvgrid" id="hLv"></div>
+      <p id="hNote"></p>
+      <p class="warnbox" id="hWarn" hidden>Permainan yang sedang berjalan akan diganti dengan yang baru.</p>
+      <button id="hPlay" class="primary play">Main</button>
+    </div>
+    <div class="hrow">
+      <button id="hScore"><svg class="ic" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>Riwayat skor</button>
+      <button id="hHow"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01"/></svg>Cara main</button>
+      <button id="hSet"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>Pengaturan</button>
+    </div>
+    <p class="hbest" id="hBest"></p>
+  </div>
+</div>
+<div id="over" class="over" hidden></div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var nf = function (n) { return Number(n).toLocaleString('id-ID'); };
+  var fmt = function (s) { s = Math.max(0, Math.floor(s)); var m = Math.floor(s / 60), x = s % 60; return (m < 10 ? '0' : '') + m + ':' + (x < 10 ? '0' : '') + x; };
+  var byId = function (a, id) { for (var i = 0; i < a.length; i++) if (a[i].id === id) return a[i]; return a[0]; };
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
+    del: function (k) { try { localStorage.removeItem(k); } catch (e) { /* abaikan */ } }
+  };
+  var G = null, K = function (n) { return G.id + '.' + n + '.v1'; };
+  var MODES = [{ id: 'santai', name: 'Santai', sub: 'tanpa waktu' }, { id: 'pro', name: 'Pro', sub: 'lawan waktu' }];
+  var settings = { sound: true, vibrate: true };
+  var prefs = { mode: 'santai', level: null };
+  var cur = { mode: 'santai', level: null };
+  var playing = false, started = false, over = false, elapsed = 0, lastTick = Date.now(), hud = { score: 0, second: 0 };
+  var stage = $('stage'), tip = $('tip'), overEl = $('over'), home = $('home');
+  var S = window.S = { stage: stage, store: store, nf: nf, fmt: fmt, cur: cur };
+
+  /* ---------- suara ---------- */
+  var SND_ON = '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/>', SND_OFF = '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="m17 9 5 6M22 9l-5 6"/>';
+  var AC = null, master = null;
+  function ac() {
+    if (AC) return AC;
+    try { var C = window.AudioContext || window.webkitAudioContext; if (!C) return null; AC = new C(); master = AC.createGain(); master.gain.value = .55; master.connect(AC.destination); } catch (e) { AC = null; }
+    return AC;
+  }
+  document.addEventListener('pointerdown', function () { var a = ac(); if (a && a.state === 'suspended') a.resume().catch(function () { /* abaikan */ }); }, true);
+  function tone(f, t0, dur, vol, type, to) {
+    var a = AC, o = a.createOscillator(), g = a.createGain(), t = a.currentTime + t0;
+    o.type = type || 'sine'; o.frequency.setValueAtTime(f, t); if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + .02);
+  }
+  var SFX = {
+    click: function () { tone(800, 0, .035, .1, 'square'); },
+    tick: function () { tone(1300, 0, .04, .12, 'square'); },
+    win: function () { [523, 659, 784, 1047, 784, 1047, 1319].forEach(function (f, i) { tone(f, i * .12, .22, .22, 'triangle'); }); },
+    lose: function () { [440, 392, 330, 262].forEach(function (f, i) { tone(f, i * .18, .3, .2, 'sawtooth'); }); }
+  };
+  S.tone = tone; S.addSfx = function (o) { for (var k in o) SFX[k] = o[k]; };
+  S.sounds = [];
+  S.sfx = function (name) {
+    if (!settings.sound) return;
+    S.sounds.push(name); if (S.sounds.length > 80) S.sounds.shift();
+    var a = ac(); if (!a || a.state === 'suspended') return;
+    try { SFX[name](); } catch (e) { /* abaikan */ }
+  };
+  S.buzz = function (p) { if (settings.vibrate && navigator.vibrate) { try { navigator.vibrate(p); } catch (e) { /* abaikan */ } } };
+  function saveSettings() { store.set(K('settings'), JSON.stringify(settings)); nav(); }
+
+  /* ---------- skor ---------- */
+  function loadScores() {
+    var out = { santai: [], pro: [] };
+    try { var o = JSON.parse(store.get(K('scores')) || 'null'); if (o) ['santai', 'pro'].forEach(function (m) { if (Array.isArray(o[m])) out[m] = o[m].filter(function (r) { return r && typeof r.s === 'number'; }); }); } catch (e) { /* kosong */ }
+    return out;
+  }
+  function bestScore(m) { var l = loadScores()[m]; return l.length ? l[0].s : 0; }
+  function refreshBest() { $('best').textContent = nf(bestScore(cur.mode)); }
+
+  /* ---------- timer ---------- */
+  var overlayOpen = function () { return !home.hidden || !overEl.hidden; };
+  var running = function () { return playing && started && !over && !overlayOpen() && !document.hidden; };
+  S.elapsed = function () { return elapsed; };
+  S.remaining = function () { return Math.max(0, cur.level.pro - elapsed); };
+  function renderTime() {
+    var t = $('time');
+    if (cur.mode === 'pro') { var r = S.remaining(); t.textContent = fmt(r); t.classList.toggle('warn', started && r <= 15 && !over); }
+    else { t.textContent = fmt(elapsed); t.classList.remove('warn'); }
+  }
+  setInterval(function () {
+    var now = Date.now(), dt = (now - lastTick) / 1000; lastTick = now;
+    if (!running()) return;
+    elapsed += Math.min(dt, 1); renderTime();
+    if (cur.mode === 'pro' && elapsed >= cur.level.pro) S.finish('time');
+  }, 250);
+
+  /* ---------- HUD & simpan ---------- */
+  S.hud = function (score, second) { hud.score = score; hud.second = second; $('score').textContent = nf(score); $('second').textContent = nf(second); nav(); };
+  S.flash = function (msg) { tip.textContent = msg; tip.hidden = false; clearTimeout(S.flash.h); S.flash.h = setTimeout(function () { tip.hidden = true; }, 1600); };
+  function save() {
+    if (!playing || over) return;
+    var g = G.serialize(); if (!g) return;
+    store.set(K('save'), JSON.stringify({ mode: cur.mode, level: cur.level.id, elapsed: elapsed, started: started, hud: hud, g: g }));
+  }
+  S.save = function () { save(); };
+  S.resetTimer = function () { elapsed = 0; started = false; lastTick = Date.now(); renderTime(); };
+  S.setLevelTime = function (sec) { cur.level.pro = sec; renderTime(); };
+  S.setChip = function (t) { var ch = $('chip'); ch.textContent = byId(MODES, cur.mode).name + ' · ' + t; ch.classList.toggle('pro', cur.mode === 'pro'); };
+  S.moved = function () { if (!started) { started = true; lastTick = Date.now(); } save(); };
+  function loadSaved() {
+    var raw = store.get(K('save')); if (!raw) return null;
+    try {
+      var d = JSON.parse(raw);
+      if (!d || !d.g || typeof d.elapsed !== 'number') return null;
+      var lv = byId(G.levels, d.level); if (lv.id !== d.level) return null;
+      if (d.mode !== 'santai' && d.mode !== 'pro') return null;
+      return d;
+    } catch (e) { return null; }
+  }
+
+  /* ---------- sheet ---------- */
+  function openSheet(html, center) {
+    overEl.className = 'over' + (center ? ' center' : ''); overEl.innerHTML = '<div class="sheet">' + html + '</div>'; overEl.hidden = false;
+    var sh = overEl.firstChild; sh.scrollTop = 0; return sh;
+  }
+  function closeSheet() { overEl.hidden = true; overEl.innerHTML = ''; lastTick = Date.now(); }
+  function confirmSheet(title, text, okLabel, fn, danger) {
+    var sh = openSheet('<h2>' + title + '</h2><p>' + text + '</p><div class="acts two"><button data-a="no">Batal</button><button data-a="ok" class="' + (danger ? 'danger' : 'primary') + '">' + okLabel + '</button></div>', true);
+    sh.querySelector('[data-a="no"]').onclick = closeSheet;
+    sh.querySelector('[data-a="ok"]').onclick = function () { closeSheet(); fn(); };
+  }
+
+  /* ---------- selesai ---------- */
+  S.finish = function (outcome) {
+    if (over || !playing) return;
+    over = true; var score = hud.score;
+    var prev = bestScore(cur.mode), all = loadScores(), l = all[cur.mode];
+    if (score > 0) {
+      l.push({ s: score, lv: cur.level.id, d: Date.now(), o: outcome, x: G.recordLabel ? G.recordLabel() : null });
+      l.sort(function (a, b) { return b.s - a.s || b.d - a.d; }); all[cur.mode] = l.slice(0, 15);
+      store.set(K('scores'), JSON.stringify(all));
+    }
+    store.del(K('save'));
+    refreshBest(); nav();
+    var rec = score > 0 && score > prev;
+    var rt = G.resultText(outcome, score);
+    S.sfx(outcome === 'lose' || outcome === 'time' ? 'lose' : 'win'); S.buzz(outcome === 'win' ? [30, 60, 30] : [60]);
+    setTimeout(function () {
+      var sh = openSheet('<p class="big">' + rt.big + '</p><p class="sc">' + nf(score) + '</p><p>' + (rec ? 'Rekor baru untuk mode ' + byId(MODES, cur.mode).name + '!' : 'Terbaik ' + byId(MODES, cur.mode).name + ': ' + nf(Math.max(prev, score))) + '<br>' + rt.line + '</p>' +
+        '<div class="acts"><button data-a="again" class="primary">Main lagi</button><button data-a="home">Menu utama</button></div>', true);
+      sh.querySelector('[data-a="again"]').onclick = function () { closeSheet(); begin(cur.mode, cur.level, null); };
+      sh.querySelector('[data-a="home"]').onclick = function () { closeSheet(); showHome(); };
+    }, 700);
+  };
+
+  /* ---------- mulai ---------- */
+  function begin(mode, level, saved) {
+    cur.mode = mode; cur.level = level; over = false; playing = true;
+    elapsed = saved ? saved.elapsed : 0; started = saved ? !!saved.started : false; lastTick = Date.now();
+    stage.innerHTML = ''; hud = { score: 0, second: 0 };
+    document.body.classList.remove('at-home'); home.hidden = true;
+    var ch = $('chip'); ch.textContent = byId(MODES, mode).name + ' · ' + level.name; ch.classList.toggle('pro', mode === 'pro');
+    $('timeLbl').textContent = mode === 'pro' ? 'Sisa' : 'Waktu';
+    G.start({ mode: mode, level: level, saved: saved ? saved.g : null, stage: stage });
+    if (saved && saved.hud) S.hud(saved.hud.score, saved.hud.second);
+    renderTime(); refreshBest(); nav(); save();
+    prefs.mode = mode; prefs.level = level.id; store.set(K('prefs'), JSON.stringify(prefs));
+  }
+  S.cur = cur; S.openSheet = openSheet; S.closeSheet = closeSheet;
+
+  /* ---------- navigasi bawah ---------- */
+  function nav() {
+    var n = $('nav'), html = '';
+    var ic = function (id, label, path, extra) { return '<button id="' + id + '" aria-label="' + label + '" title="' + label + '"' + (extra || '') + '><svg class="ic" viewBox="0 0 24 24">' + path + '</svg></button>'; };
+    if (G.hasUndo) html += ic('nUndo', 'Urungkan langkah', '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>', (cur.mode === 'santai' && G.canUndo()) ? '' : ' disabled');
+    if (G.allowEnd) html += ic('nEnd', 'Akhiri dan catat skor', '<path d="M5 21V4M5 5h12l-2 4 2 4H5"/>', (playing && !over && hud.score > 0) ? '' : ' disabled');
+    html += ic('nAgain', 'Main baru', '<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/>');
+    html += ic('nSnd', settings.sound ? 'Matikan suara' : 'Nyalakan suara', settings.sound ? SND_ON : SND_OFF, ' aria-pressed="' + (!settings.sound) + '"');
+    html += ic('nHome', 'Menu utama', '<path d="M4 11 12 4l8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-6h4v6"/>');
+    n.innerHTML = html;
+    var b = function (id, fn) { var e = $(id); if (e) e.onclick = fn; };
+    b('nUndo', function () { if (cur.mode === 'santai' && G.canUndo()) { G.undo(); S.sfx('click'); save(); } });
+    b('nEnd', function () { confirmSheet('Akhiri permainan?', 'Skor ' + nf(hud.score) + ' akan dicatat ke riwayat.', 'Akhiri', function () { S.finish('end'); }); });
+    b('nAgain', function () { confirmSheet('Main baru?', 'Permainan ini tidak akan dicatat ke riwayat.', 'Main baru', function () { begin(cur.mode, cur.level, null); }); });
+    b('nSnd', function () { settings.sound = !settings.sound; saveSettings(); if (settings.sound) S.sfx('click'); });
+    b('nHome', showHome);
+  }
+  S.refreshNav = nav;
+
+  /* ---------- beranda ---------- */
+  var hSel = { mode: 'santai', level: null };
+  function showHome() {
+    var sv = loadSaved(), cont = $('hCont');
+    if (playing && !over) save();
+    if (!playing || over) { /* simpanan di storage */ } 
+    document.body.classList.add('at-home'); home.hidden = false; closeSheet();
+    hSel.mode = hSel.mode || 'santai';
+    renderHome(sv);
+    home.scrollTop = 0;
+  }
+  function renderHome(sv) {
+    var tabs = $('hTabs'); tabs.innerHTML = '';
+    MODES.forEach(function (m) {
+      var b = document.createElement('button'); b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(hSel.mode === m.id));
+      b.innerHTML = m.name + '<small>' + m.sub + '</small>'; b.onclick = function () { hSel.mode = m.id; S.sfx('click'); renderHome(sv); };
+      tabs.appendChild(b);
+    });
+    var lv = $('hLv'); lv.innerHTML = ''; lv.hidden = !!G.noLevels;
+    if (!G.noLevels) G.levels.forEach(function (l) {
+      var b = document.createElement('button'); b.className = 'lv'; b.setAttribute('aria-pressed', String(hSel.level === l.id));
+      b.innerHTML = '<b>' + l.name + '</b><small>' + l.sub + '</small>'; b.onclick = function () { hSel.level = l.id; S.sfx('click'); renderHome(sv); };
+      lv.appendChild(b);
+    });
+    var L = byId(G.levels, hSel.level);
+    if (G.homeNote) $('hNote').textContent = G.homeNote(hSel.mode); else $('hNote').textContent = L.desc + (hSel.mode === 'pro' ? ' Waktu ' + fmt(L.pro) + ', skor dihitung saat waktu habis atau permainan selesai.' : ' Tanpa batas waktu.');
+    var cont = $('hCont');
+    cont.hidden = !sv;
+    if (sv) { var sl = byId(G.levels, sv.level); $('hContInfo').textContent = byId(MODES, sv.mode).name + ' · ' + (G.label ? G.label(sv.g) : sl.name) + ' · skor ' + nf(sv.hud ? sv.hud.score : 0); cont.onclick = function () { begin(sv.mode, sl, sv); hSel.mode = sv.mode; hSel.level = sv.level; }; }
+    $('hWarn').hidden = !sv;
+    $('hPlay').onclick = function () { S.sfx('click'); begin(hSel.mode, L, null); };
+    $('hBest').innerHTML = 'Terbaik · Santai <b>' + nf(bestScore('santai')) + '</b> · Pro <b>' + nf(bestScore('pro')) + '</b>';
+  }
+  $('hScore').onclick = function () {
+    var tab = hSel.mode;
+    (function draw() {
+      var all = loadScores(), l = all[tab];
+      var rows = l.length ? l.map(function (r, i) {
+        var d = new Date(r.d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+        var out = r.o === 'win' ? 'Selesai' : r.o === 'time' ? 'Waktu habis' : r.o === 'lose' ? 'Buntu' : 'Diakhiri';
+        return '<div class="rec"><span class="no">' + (i + 1) + '</span><div><b>' + nf(r.s) + '</b><small>' + (r.x || byId(G.levels, r.lv).name) + ' · ' + d + '</small></div><span class="badge' + (r.o === 'win' ? '' : ' no2') + '">' + out + '</span></div>';
+      }).join('') : '<p class="empty">Belum ada skor. Main dulu, nanti tercatat di sini.</p>';
+      var sh = openSheet('<h2>Riwayat skor</h2><div class="tabs" role="tablist" style="margin-top:10px">' + MODES.map(function (m) { return '<button role="tab" data-m="' + m.id + '" aria-selected="' + (tab === m.id) + '">' + m.name + '</button>'; }).join('') + '</div><div class="list">' + rows + '</div><div class="acts"><button data-a="x">Tutup</button></div>');
+      sh.querySelector('[data-a="x"]').onclick = closeSheet;
+      [].forEach.call(sh.querySelectorAll('[data-m]'), function (b) { b.onclick = function () { tab = b.getAttribute('data-m'); draw(); }; });
+    })();
+  };
+  $('hHow').onclick = function () {
+    var sh = openSheet('<h2>Cara main</h2><div class="how">' + G.howto + '</div><div class="acts"><button data-a="x" class="primary">Mengerti</button></div>');
+    sh.querySelector('[data-a="x"]').onclick = closeSheet;
+  };
+  $('hSet').onclick = function () {
+    (function draw() {
+      var sw = function (id, t, d, on) { return '<div class="set"><span><b>' + t + '</b><small>' + d + '</small></span><button class="sw" id="' + id + '" role="switch" aria-checked="' + on + '" aria-label="' + t + '"></button></div>'; };
+      var sh = openSheet('<h2>Pengaturan</h2>' + sw('sSnd', 'Suara', 'Efek bunyi saat bermain', settings.sound) + sw('sVib', 'Getar', 'Getaran di HP yang mendukung', settings.vibrate) +
+        '<div class="set"><span><b>Hapus data</b><small>Riwayat skor, permainan tersimpan, dan pengaturan</small></span><button id="sWipe" class="danger" style="min-height:40px">Hapus</button></div>' +
+        '<p class="about">' + G.title + ' · By TweNe</p><div class="acts"><button data-a="x" class="primary">Tutup</button></div>');
+      sh.querySelector('[data-a="x"]').onclick = closeSheet;
+      $('sSnd').onclick = function () { settings.sound = !settings.sound; saveSettings(); if (settings.sound) S.sfx('click'); draw(); };
+      $('sVib').onclick = function () { settings.vibrate = !settings.vibrate; saveSettings(); if (settings.vibrate) S.buzz(20); draw(); };
+      $('sWipe').onclick = function () {
+        confirmSheet('Hapus semua data?', 'Riwayat skor dan permainan tersimpan akan hilang. Tindakan ini tidak bisa dibatalkan.', 'Hapus', function () {
+          ['scores', 'save', 'prefs', 'settings'].forEach(function (k) { store.del(K(k)); });
+          settings.sound = true; settings.vibrate = true; playing = false; over = false; stage.innerHTML = '';
+          showHome(); S.flash('Data dihapus');
+        }, true);
+      };
+    })();
+  };
+
+  /* ---------- boot ---------- */
+  S.boot = function (game) {
+    G = game; $('gTitle').textContent = G.short || G.title; $('hLogo').textContent = G.title; $('secLbl').textContent = G.secondLabel;
+    document.title = G.title + ' TweNe';
+    try { var o = JSON.parse(store.get(K('settings')) || 'null'); if (o) { if (typeof o.sound === 'boolean') settings.sound = o.sound; if (typeof o.vibrate === 'boolean') settings.vibrate = o.vibrate; } } catch (e) { /* bawaan */ }
+    try { var p = JSON.parse(store.get(K('prefs')) || 'null'); if (p) { if (p.mode === 'santai' || p.mode === 'pro') prefs.mode = p.mode; if (p.level) prefs.level = p.level; } } catch (e) { /* bawaan */ }
+    prefs.level = byId(G.levels, prefs.level).id; hSel.mode = prefs.mode; hSel.level = prefs.level;
+    cur.level = byId(G.levels, prefs.level); cur.mode = prefs.mode;
+    G.hero($('hero'));
+    var sv = loadSaved();
+    nav(); refreshBest(); showHome();
+    var ro = window.ResizeObserver ? new ResizeObserver(function () { if (playing && G.relayout) G.relayout(); }) : null;
+    if (ro) ro.observe($('board')); else window.addEventListener('resize', function () { if (playing && G.relayout) G.relayout(); });
+    document.addEventListener('visibilitychange', function () { lastTick = Date.now(); if (document.hidden) save(); });
+    window.addEventListener('pagehide', save);
+    S.debug = { state: function () { return { playing: playing, started: started, over: over, elapsed: elapsed, mode: cur.mode, hud: hud }; } };
+  };
+})();
+
+</script>
+<script>
+(function () {
+  'use strict';
+  var S = window.S;
+  var LEVELS = [{ id: 'run', name: 'Level', sub: 'naik terus', pro: 60, desc: '' }];
+  var SHAPES = [
+    '<path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3 6.1 20.6l1.3-6.6L2.5 9.4l6.6-.8z"/>',
+    '<path d="M12 21s-8-5.2-8-11a4.5 4.5 0 0 1 8-2.7A4.5 4.5 0 0 1 20 10c0 5.8-8 11-8 11z"/>',
+    '<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/>',
+    '<path d="M13 2 4 14h6l-1 8 9-12h-6z"/>',
+    '<path d="M12 2.5S5 10 5 15a7 7 0 0 0 14 0c0-5-7-12.5-7-12.5z"/>',
+    '<path d="M20 4C10 4 4 9 4 15c0 2 1 4 2 5 1-5 5-8 9-9-3 2-6 5-7 9 8 0 14-6 12-16z"/>',
+    '<path d="M12 2l8 10-8 10-8-10z"/>',
+    '<path fill-rule="evenodd" d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 5a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"/>',
+    '<path d="M12 3l10 18H2z"/>',
+    '<path d="M12 2l8.7 5v10L12 22l-8.7-5V7z"/>',
+    '<path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/>',
+    '<circle cx="12" cy="6.2" r="4.2"/><circle cx="12" cy="17.8" r="4.2"/><circle cx="6.2" cy="12" r="4.2"/><circle cx="17.8" cy="12" r="4.2"/>'
+  ];
+  var COLORS = ['#e8895b', '#d9506f', '#7b5cc9', '#d9a21c', '#3d8fb8', '#4aa37a'];
+  var COLORS2 = COLORS;
+  var st = null, lock = false, flipped = [], grid = null, cardEls = [], timers = [];
+  // simbol = bentuk + warna; id 0-11 bentuk berbeda, id 12-35 bentuk sama dengan warna lain
+  var symColor = function (k) { return COLORS[((k % 12) + Math.floor(k / 12) * 2) % COLORS.length]; };
+  var face = function (id) { return '<svg viewBox="0 0 24 24" style="color:' + symColor(id) + '">' + SHAPES[id % 12] + '</svg>'; };
+  var MAXLV = 50;
+  var DIMS = { 6: [3, 4], 8: [4, 4], 10: [4, 5], 12: [4, 6], 15: [5, 6], 18: [6, 6], 21: [6, 7], 24: [6, 8] };
+  var EARLY = [6, 8, 10, 12, 15, 18];
+  var NOTES = { 5: 'Mulai muncul kartu bentuk sama dengan warna berbeda.', 7: 'Papan membesar jadi 21 pasang.', 11: 'Papan terbesar: 24 pasang.', 21: 'Kartu yang belum cocok dikocok setiap 5 kali salah.', 29: 'Kocok lebih sering: setiap 4 kali salah.', 37: 'Kocok setiap 3 kali salah.', 45: 'Kocok setiap 2 kali salah. Sampai Level 50!' };
+  function spec(n) {
+    var pairs = n <= 6 ? EARLY[n - 1] : n <= 10 ? 21 : 24, d = DIMS[pairs], base = pairs * 7.5 + 15;
+    var pro = Math.round(base * (n <= 6 ? 1 : Math.max(.6, 1 - (n - 6) * .01)));
+    return { n: n, pairs: pairs, cols: d[0], rows: d[1], pro: pro, reveal: Math.max(300, 950 - (n - 1) * 13), mix: pairs > 12, shuffleK: n >= 21 ? Math.max(2, 5 - Math.floor((n - 21) / 8)) : 0 };
+  }
+  function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  function newLevel(n, score) {
+    var sp = spec(n), ids = [], pool = [], i;
+    for (i = 0; i < (sp.mix ? 36 : 12); i++) pool.push(i);
+    shuffle(pool).slice(0, sp.pairs).forEach(function (k) { ids.push(k, k); });
+    st = { n: n, cols: sp.cols, rows: sp.rows, deck: shuffle(ids), matched: ids.map(function () { return false; }), score: score, moves: 0, combo: 0, miss: 0 };
+    S.setLevelTime(sp.pro); S.setChip('Level ' + n);
+  }
+  function valid(d) {
+    if (!d || typeof d.n !== 'number' || d.n < 1 || d.n > MAXLV || d.n !== Math.floor(d.n)) return false;
+    var sp = spec(d.n), n = sp.cols * sp.rows;
+    if (d.cols !== sp.cols || d.rows !== sp.rows || !Array.isArray(d.deck) || !Array.isArray(d.matched) || d.deck.length !== n || d.matched.length !== n) return false;
+    var cnt = {}, i;
+    for (i = 0; i < n; i++) { var v = d.deck[i]; if (typeof v !== 'number' || v < 0 || v >= 36 || (!sp.mix && v >= 12)) return false; cnt[v] = (cnt[v] || 0) + 1; }
+    for (var k in cnt) if (cnt[k] !== 2) return false;
+    for (i = 0; i < n; i++) if (d.matched[i] && !d.matched[d.deck.indexOf(d.deck[i]) === i ? d.deck.lastIndexOf(d.deck[i]) : d.deck.indexOf(d.deck[i])]) return false;
+    return typeof d.score === 'number' && isFinite(d.score) && d.score >= 0;
+  }
+  function build() {
+    clearT(); S.stage.innerHTML = ''; flipped = []; lock = false; cardEls = [];
+    grid = document.createElement('div'); grid.className = 'mgrid'; S.stage.appendChild(grid);
+    st.deck.forEach(function (id, i) {
+      var b = document.createElement('button'); b.className = 'mc' + (st.matched[i] ? ' up ok' : ''); b.setAttribute('aria-label', 'Kartu ' + (i + 1));
+      b.innerHTML = '<div class="in"><div class="f back"></div><div class="f front">' + face(id) + '</div></div>';
+      b.onclick = function () { tap(i); }; grid.appendChild(b); cardEls.push(b);
+    });
+    layout();
+  }
+  function layout() {
+    if (!grid) return;
+    var r = S.stage.getBoundingClientRect(), g = Math.max(6, Math.round(Math.min(r.width, r.height) / (st.cols > 4 ? 52 : 40))), c = st.cols, rw = st.rows;
+    var ra = rw >= 7 ? .95 : .78, w = Math.floor(Math.min((r.width - g * (c - 1)) / c, ((r.height - g * (rw - 1)) / rw) * ra, 120)), h = Math.floor(w / ra);
+    grid.style.gridTemplateColumns = 'repeat(' + c + ',' + w + 'px)'; grid.style.gridAutoRows = h + 'px'; grid.style.gap = g + 'px';
+    var tw = w * c + g * (c - 1), th = h * rw + g * (rw - 1); grid.style.marginLeft = (-tw / 2) + 'px'; grid.style.marginTop = (-th / 2) + 'px';
+  }
+  function clearT() { timers.forEach(clearTimeout); timers = []; }
+  function later(fn, ms) { var t = setTimeout(fn, ms); timers.push(t); }
+  function tap(i) {
+    if (lock || st.matched[i] || flipped.indexOf(i) >= 0) return;
+    if (S.debug && S.debug.state().over) return;
+    flipped.push(i); cardEls[i].classList.add('up'); S.sfx('flip'); S.buzz(8); S.moved();
+    if (flipped.length < 2) return;
+    var a = flipped[0], b = flipped[1], sp = spec(st.n); st.moves++;
+    if (st.deck[a] === st.deck[b]) {
+      st.matched[a] = st.matched[b] = true; st.combo++; st.score += (100 + 50 * (st.combo - 1)) ;
+      later(function () { cardEls[a].classList.add('ok'); cardEls[b].classList.add('ok'); S.sfx('match'); S.buzz([15, 40, 15]); }, 300);
+      flipped = [];
+      if (st.matched.every(Boolean)) { lock = true; S.hud(st.score, st.n); S.moved(); later(levelDone, 900); return; }
+      S.hud(st.score, st.n); S.moved();
+    } else {
+      st.combo = 0; lock = true; S.hud(st.score, st.n);
+      later(function () { cardEls[a].classList.add('bad'); cardEls[b].classList.add('bad'); S.sfx('miss'); }, 330);
+      later(function () { cardEls[a].classList.remove('up', 'bad'); cardEls[b].classList.remove('up', 'bad'); flipped = []; if (sp.shuffleK && ++st.miss >= sp.shuffleK) { st.miss = 0; remix(); } lock = false; S.save(); }, sp.reveal);
+    }
+  }
+  function remix() {
+    var idx = [], vals = [];
+    st.deck.forEach(function (v, i) { if (!st.matched[i]) { idx.push(i); vals.push(v); } });
+    if (idx.length < 3) return;
+    shuffle(vals); idx.forEach(function (i, k) { st.deck[i] = vals[k]; cardEls[i].querySelector('.front').innerHTML = face(vals[k]); cardEls[i].classList.remove('mix'); void cardEls[i].offsetWidth; cardEls[i].classList.add('mix'); });
+    S.sfx('mix'); S.buzz([30, 30]); S.flash('Kartu dikocok!'); S.save();
+  }
+  function levelDone() {
+    var sp = spec(st.n), par = sp.pairs * 2 + Math.ceil(sp.pairs / 2), done = st.n, moves = st.moves;
+    var bMoves = Math.max(0, par - moves) * 25, bTime = S.cur.mode === 'pro' ? Math.floor(S.remaining()) * 10 : 0, bLevel = done * 100;
+    st.score += bMoves + bTime + bLevel;
+    var score = st.score, next = spec(Math.min(MAXLV, done + 1));
+    if (done >= MAXLV) { st.win = true; S.hud(score, done); S.finish('win'); return; }
+    S.sfx('level'); S.buzz([20, 50, 20]);
+    newLevel(done + 1, score); S.resetTimer(); S.hud(score, st.n); build(); S.save();
+    var rows = '<div class="how"><b>' + moves + '</b> langkah (target ' + par + ')<br>Bonus langkah <b>+' + S.nf(bMoves) + '</b><br>' + (S.cur.mode === 'pro' ? 'Bonus waktu <b>+' + S.nf(bTime) + '</b><br>' : '') + 'Bonus level <b>+' + S.nf(bLevel) + '</b></div>';
+    var sh = S.openSheet('<p class="big">Level ' + done + ' selesai</p><p class="sc">' + S.nf(score) + '</p><p>Berikutnya: <b style="color:var(--ink)">' + next.pairs + ' pasang</b>' + (S.cur.mode === 'pro' ? ', waktu ' + S.fmt(next.pro) : '') + (NOTES[done + 1] ? '<br>' + NOTES[done + 1] : '') + '</p>' + rows + '<div class="acts"><button data-a="go" class="primary">Lanjut ke Level ' + (done + 1) + '</button></div>', true);
+    sh.querySelector('[data-a="go"]').onclick = function () { S.closeSheet(); S.sfx('click'); };
+  }
+  S.addSfx({
+    flip: function () { S.tone(520, 0, .05, .12, 'triangle', 760); },
+    match: function () { S.tone(660, 0, .1, .22, 'triangle'); S.tone(990, .08, .16, .22, 'triangle'); },
+    miss: function () { S.tone(200, 0, .14, .16, 'sawtooth', 140); },
+    mix: function () { [330, 262, 392, 294].forEach(function (f, i) { S.tone(f, i * .05, .1, .16, 'square'); }); },
+    level: function () { [523, 659, 784, 1047].forEach(function (f, i) { S.tone(f, i * .09, .18, .2, 'triangle'); }); }
+  });
+
+  S.boot({
+    id: 'memory', title: 'Memory Match', short: 'Memory', secondLabel: 'Level', levels: LEVELS, noLevels: true, hasUndo: false, allowEnd: true,
+    homeNote: function (mode) { return 'Ada 50 level, mulai dari 6 pasang. Makin tinggi, kartu makin banyak, makin mirip, dan mulai Level 21 dikocok.' + (mode === 'pro' ? ' Tiap level ada batas waktu, kalau habis permainan selesai.' : ' Tanpa batas waktu, berhenti kapan saja lewat tombol bendera.'); },
+    howto: '<b>Ketuk dua kartu</b> untuk membukanya. Kalau gambarnya sama, pasangan itu tetap terbuka. Kalau beda, keduanya menutup lagi. Ingat letaknya.<br><b>Level naik terus</b>: Level 1 hanya 6 pasang. Ada 50 level. Kartu bertambah sampai 48 kartu, kartu menutup makin cepat, dan mulai Level 5 ada kartu berbentuk sama dengan warna berbeda. Dari Level 21, kartu yang belum cocok dikocok tiap beberapa kali salah.<br><b>Skor</b>: 100 poin per pasangan, plus bonus kalau berturut-turut benar. Tiap level selesai memberi bonus level dan bonus langkah sedikit.<br><b>Pro</b>: setiap level ada batas waktu dan sisa waktu jadi bonus. Waktu habis berarti permainan selesai, skor tetap dicatat.<br><b>Santai</b>: tanpa waktu. Tekan bendera untuk mengakhiri dan mencatat skor.',
+    start: function (ctx) {
+      if (ctx.saved && valid(ctx.saved)) { st = ctx.saved; st.combo = 0; st.miss = Math.max(0, +st.miss || 0); S.setLevelTime(spec(st.n).pro); S.setChip('Level ' + st.n); } else newLevel(1, 0);
+      build(); S.hud(st.score, st.n);
+    },
+    relayout: layout,
+    label: function (g) { return 'Level ' + (g && g.n ? g.n : 1); },
+    recordLabel: function () { return st ? (st.win ? 'Tamat 50 level' : 'Level ' + st.n) : null; },
+    serialize: function () { return st ? { n: st.n, cols: st.cols, rows: st.rows, deck: st.deck, matched: st.matched, score: st.score, moves: st.moves, combo: 0, miss: st.miss || 0 } : null; },
+    canUndo: function () { return false; },
+    resultText: function (outcome) {
+      var n = st ? st.n : 1, pairs = st ? st.matched.filter(Boolean).length / 2 : 0, total = st ? st.deck.length / 2 : 0, done = n - 1;
+      var line = 'Sampai Level ' + n + (pairs ? ', ' + pairs + ' dari ' + total + ' pasang di level itu.' : '.');
+      if (outcome === 'win') return { big: 'Tamat! Level 50', line: 'Semua 50 level diselesaikan. Mantap!' };
+      return outcome === 'time' ? { big: 'Waktu habis', line: line } : { big: 'Sampai Level ' + n, line: done ? done + ' level diselesaikan.' : 'Belum ada level yang selesai.' };
+    },
+    hero: function (h) {
+      h.innerHTML = '<div class="hero3">' + [0, 1, 3, 4].map(function (k) { return '<div class="mc"><div class="in"><div class="f back"></div><div class="f front">' + face(k) + '</div></div></div>'; }).join('') + '</div>';
+    }
+  });
+})();
+
+</script>
+
+</body>
+</html>
